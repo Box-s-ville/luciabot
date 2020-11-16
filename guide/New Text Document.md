@@ -13,7 +13,7 @@ NoneBot 过去是基于 酷Q 和 CQHttp 插件的机器人框架。可以理解�
 不过在这之后出现了 [OneBot](https://github.com/howmanybots/onebot) “标准”，提供和 CQHttp 类似的 api 规则。很多现在的机器人“后端”都可以遵循此标准，例如 go-cqhttp 和 mirai native 等。所以选择对的后端对实际上开发没有太大的影响。比如 go-cqhttp，可以当作 酷Q 的"drop-in replacement"。
 
 ## 开始使用 Nonebot
-首先使用 pip 安装 nonebot 1.8.0 ：
+首先使用 pip 安装 nonebot （截至此稿完成最新版本为 1.8.0）：
 ```sh
 $ pip install nonebot
 ```
