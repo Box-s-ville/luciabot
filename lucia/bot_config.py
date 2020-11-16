@@ -20,3 +20,6 @@ SESSION_EXPIRE_TIMEOUT = timedelta(minutes=2)
 # 服务器和端口
 HOST = '127.0.0.1'
 PORT = 8765
+
+# 关闭调试输出，提升性能。
+DEBUG = False

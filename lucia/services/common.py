@@ -1,4 +1,6 @@
-from httpx import AsyncClient
+from httpx import AsyncClient, HTTPError
+
+from .log import logger
 
 
 class ServiceException(Exception):
@@ -13,7 +15,10 @@ class ServiceException(Exception):
 
 async def fetch_text(uri: str) -> str:
     async with AsyncClient(headers={ 'User-Agent': 'box-s-ville.luciabot' }) as client:
-        res = await client.get(uri)
-        if res.is_error:
+        try:
+            res = await client.get(uri)
+            res.raise_for_status()
+        except HTTPError as e:
+            logger.exception(e)
             raise ServiceException('API 服务目前不可用')
         return res.text

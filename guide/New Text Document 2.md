@@ -11,6 +11,8 @@
 COMMAND_START = { '' }
 # 机器人昵称，设定后 "@机器人 天气" 和 "lucia 天气" 效果相同。
 NICKNAME = { 'lucia', 'Lucia', '莉西亚' }
+# 关闭调试输出，提升性能。
+DEBUG = False
 ```
 
 [官方文档](https://docs.nonebot.dev/api.html#%E9%85%8D%E7%BD%AE) 中讲述了更多配置选项，在这篇文章里只使用了部分。
@@ -52,7 +54,9 @@ $ curl 'wttr.in/HongKong?format=1'
 
 `luciabot/lucia/services/common.py`
 ```py
-from httpx import AsyncClient
+from httpx import AsyncClient, HTTPError
+
+from .log import logger
 
 
 class ServiceException(Exception):
@@ -67,13 +71,36 @@ class ServiceException(Exception):
 
 async def fetch_text(uri: str) -> str:
     async with AsyncClient(headers={ 'User-Agent': 'box-s-ville.luciabot' }) as client:
-        res = await client.get(uri)
-        if res.is_error:
+        try:
+            res = await client.get(uri)
+            res.raise_for_status()
+        except HTTPError as e:
+            logger.exception(e)
             raise ServiceException('API 服务目前不可用')
         return res.text
 ```
 
 这个文件定义一个服务模块的异常类型和一个用于 HTTP GET TEXT 文件的辅助函数。
+
+`luciabot/lucia/services/log.py`
+```py
+import logging
+import sys
+
+
+_handler = logging.StreamHandler(sys.stdout)
+_handler.setFormatter(
+    logging.Formatter('[%(asctime)s %(name)s] %(levelname)s: %(message)s')
+)
+
+logger = logging.getLogger('lucia')
+logger.addHandler(_handler)
+logger.setLevel(logging.INFO)
+```
+
+这个文件提供一个 logging 服务，其输出模式和 NoneBot 内置的 logging 一致。当我们自己的代码想要打印东西时，可以使用这个服务。使用分别的 logging 可以帮助区分问题是在于我们自己的机器人还是 NoneBot 框架本身。
+
+Tip: `logger.setLevel()` 如有必要，可以设置其从配置文件读取，例如 `bot_config.py`。
 
 接下来实现真正的天气服务：
 
@@ -164,6 +191,7 @@ lucia
 │   └── weather.py
 └── services/
     ├── common.py
+    ├── log.py
     └── weather.py
 ```
 
