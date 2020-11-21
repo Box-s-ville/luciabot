@@ -33,7 +33,7 @@
 	"ws_reverse_servers": [
 		{
 			"enabled": true,
-			"reverse_url": "ws://127.0.0.1:8765/ws",
+			"reverse_url": "ws://lucia:8765/ws",
 			"reverse_api_url": "",
 			"reverse_event_url": "",
 			"reverse_reconnect_interval": 3000

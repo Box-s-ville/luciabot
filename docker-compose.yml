@@ -1,0 +1,43 @@
+version: '3'
+
+services:
+  # 用来运行 gocqhttp 二进制，注意这里目录是挂载的
+  gocqhttp:
+    container_name: gocqhttp
+    environment:
+      - TZ=Asia/Singapore
+    tty: true
+    stdin_open: true
+    restart: always
+    volumes:
+      - ./gocqhttp:/usr/src/app:delegated
+    build:
+      context: ./gocqhttp
+
+  # nonebot/quart
+  lucia:
+    container_name: lucia
+    environment:
+      - TZ=Asia/Singapore
+      - DATABASE_URI=postgresql://root:password@postgres:5432/lucia
+    ports:
+      - 8765:8765
+    depends_on:
+      - postgres
+    build:
+      context: ./lucia
+
+  # dev 数据库
+  postgres:
+    container_name: postgres
+    environment:
+      - TZ=Asia/Singapore
+      - PGTZ=Asia/Singapore
+      - POSTGRES_USER=root
+      - POSTGRES_PASSWORD=password
+      - POSTGRES_DB=lucia
+    image: postgres:13.1-alpine
+
+networks:
+  default:
+    name: luciabot-default
