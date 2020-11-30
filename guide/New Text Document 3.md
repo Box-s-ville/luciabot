@@ -32,11 +32,13 @@ RUN apk update && apk add --virtual build-dependencies build-base gcc && apk add
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
+RUN apk del build-dependencies
+
 COPY . .
 
 CMD [ "hypercorn", "bot:app", "-b", "0.0.0.0:8765" ]
 ```
-Tip: 在这里我们没有直接运行 `bot.py` 而是使用了 wsgi app（因为官方推荐这么做）。这种情况下机器人（Quart 框架）会读取在命令行这里传入的 IP 和端口，而无视 `bot_config.py` 的 IP 和端口。
+Tip: 在这里我们没有直接运行 `bot.py` 而是使用了 asgi app（因为官方推荐这么做）。这种情况下机器人（Quart 框架）会读取在命令行这里传入的 IP 和端口，而无视 `bot_config.py` 的 IP 和端口。
 
 在相同的目录下创建 `requirements.txt`：
 ```
@@ -207,7 +209,8 @@ class GroupUser(db.Model):
 import random
 from datetime import datetime
 
-from services.db_context import db
+from .log import logger
+from .db_context import db
 from models.group_user import GroupUser
 
 
@@ -243,6 +246,9 @@ async def _handle_sign_in(user: GroupUser, present: datetime) -> str:
         signin_time_last=present,
         love=new_love,
     ).apply()
+
+    # 顺便打印此事件的日志
+    logger.info(f'(USER {user.user_qq}, GROUP {user.belonging_group}) SIGNED IN successfully. score: {new_love:.2f} (+{love_added:.2f}).')
 
     return f'{message} 好感度：{new_love:.2f} (+{love_added:.2f})'
 ```

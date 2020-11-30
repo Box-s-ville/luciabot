@@ -1,7 +1,8 @@
 import random
 from datetime import datetime
 
-from services.db_context import db
+from .log import logger
+from .db_context import db
 from models.group_user import GroupUser
 
 
@@ -33,6 +34,9 @@ async def _handle_sign_in(user: GroupUser, present: datetime) -> str:
         signin_time_last=present,
         love=new_love,
     ).apply()
+
+    # 顺便打印此事件的日志
+    logger.info(f'(USER {user.user_qq}, GROUP {user.belonging_group}) SIGNED IN successfully. score: {new_love:.2f} (+{love_added:.2f}).')
 
     return f'{message} 好感度：{new_love:.2f} (+{love_added:.2f})'
 
