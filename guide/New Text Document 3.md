@@ -352,7 +352,7 @@ lucia:
 
 这是控制台输出的信息：
 ```
-lucia       | [2020-12-27 11:18:24,936 lucia] INFO: (USER 123456789, GROUP 12345678) CHECKED IN successfully. score: 0.35 (+0.35).
+lucia       | [2020-11-21 11:18:24,936 lucia] INFO: (USER 123456789, GROUP 12345678) CHECKED IN successfully. score: 0.35 (+0.35).
 ```
 
 重复的签到会失败，我们需要等到下一天才能签到下一次。
@@ -393,3 +393,188 @@ luciabot/
         └── weather.py
 ```
 注意这里省略了自动生成的临时文件。
+
+## 进阶使用：发送图片
+
+当用户签到时，为了炫目可以选择发送一张图片。NoneBot 支持发送图片，而要发送的图片在这里使用 Pillow 库来生成。
+
+需要在 dockerfile 中添加这个依赖，打开 `luciabot/lucia/Dockerfile` 并作如下更新：
+```diff
+  ...
+- RUN apk update && apk add --virtual build-dependencies build-base gcc && apk add tzdata
++ RUN apk update \
++     && apk add --virtual build-dependencies build-base gcc \
++     && apk add tzdata \
++     && apk add zlib-dev jpeg-dev libjpeg freetype-dev
+  ...
+```
+
+`requirements.txt` 中添加如下一行安装 Pillow：
+```diff
+  ...
++ Pillow==8.0.1
+```
+
+创建 `luciabot/lucia/resources` 文件夹，拷贝如下两个用于绘图的文件：
+* `group_user_check_bg.png`
+* `SourceHanSans-Regular.otf`
+
+文件请在[这里下载](https://github.com/Box-s-ville/luciabot/tree/5dc389946f0dedd54d3f9841b3f0796e0819c0e5/lucia/resources) （使用前阅读项目 README）。
+
+在开始之前我们对项目的配置结构做一些微调，目的是把一些常量提取到一个单独的文件。
+
+创建 `luciabot/lucia/service_config.py` 文件，内容如下。
+```py
+import logging
+import os
+
+LOGGING_LEVEL = logging.INFO
+DATABASE_URI = os.environ['DATABASE_URI']
+PROCESSPOOL_SIZE = 3 # 生成图片要用到
+RESOURCES_DIR = 'resources' # 生成图片要用到
+```
+
+同样地，`luciabot/lucia/services/db_context.py` 的内容也要做些调整。
+```py
+# ...
+from service_config import DATABASE_URI
+# ...
+
+async def init():
+    await db.set_bind(DATABASE_URI)
+    await db.gino.create_all()
+    logger.info(f'Database loaded successfully!')
+```
+
+`luciabot/lucia/services/log.py` 的内容调整：
+```py
+# ...
+from service_config import LOGGING_LEVEL
+# ...
+logger.setLevel(LOGGING_LEVEL)
+```
+
+添加 `luciabot/lucia/services/processpool.py`，内容如下：
+```py
+from concurrent.futures import ProcessPoolExecutor
+
+processpool_executor = ProcessPoolExecutor(max_workers=3)
+```
+因为生成图片是一项 CPU bound 的任务，用主线程执行会造成阻塞影响消息的响应，所以这里按照官方的建议使用一个进程池。
+
+回到 `luciabot/lucia/services/group_user_checkin.py`，在这里再添加一个生成图片的代码段（并且添加相应 import）：
+```py
+import asyncio # 新
+import random
+from datetime import datetime
+from io import BytesIO  # 新
+from base64 import b64encode  # 新
+
+from PIL import Image, ImageDraw, ImageFont  # 新
+
+from .log import logger
+from .db_context import db
+from .processpool import processpool_executor  # 新
+from service_config import RESOURCES_DIR  # 新
+from models.group_user import GroupUser
+
+...
+
+async def group_user_check_use_b64img(user_qq: int, group: int, user_name: str) -> str:
+    'Returns the base64 image representation of the user check result.'
+    user = await GroupUser.ensure(user_qq, group)
+
+    # expensive operation!
+    return await asyncio.get_event_loop().run_in_executor(
+        processpool_executor,
+        _create_user_check_b64img,
+        user_name, user,
+    )
+
+
+def _create_user_check_b64img(user_name: str, user: GroupUser) -> str:
+    # 图像的参数是凭感觉来的
+    # TODO: we have a lot of byte copies. we have to optimise them.
+    bg_dir = f'{RESOURCES_DIR}/group_user_check_bg.png'
+    font_dir = f'{RESOURCES_DIR}/SourceHanSans-Regular.otf'
+
+    image = Image.open(bg_dir)
+    draw = ImageDraw.ImageDraw(image)
+    font_title = ImageFont.truetype(font_dir, 33 if len(user_name) < 8 else 28)
+    font_detail = ImageFont.truetype(font_dir, 22)
+
+    txt_user = f'{user_name} ({user.user_qq})'
+    draw.text((530, 65), txt_user, fill=(255, 255, 255), font=font_title, stroke_width=1, stroke_fill='#7042ad')
+
+    txt_detail = (
+        f'群: {user.belonging_group}\n'
+        f'好感度: {user.impression:.02f}\n'
+        f'签到次数: {user.checkin_count}\n'
+        f'上次签到: {user.checkin_time_last.strftime("%Y-%m-%d") if user.checkin_count else "从未"}'
+    )
+    draw.text((530, 115), txt_detail, fill=(255, 255, 255), font=font_detail, stroke_width=1, stroke_fill='#75559e')
+
+    buff = BytesIO()
+    image.save(buff, 'jpeg')
+    return b64encode(buff.getvalue()).decode()
+```
+
+这里需要你熟悉 Pillow 的 API。
+
+[OneBot 标准](https://github.com/howmanybots/onebot/blob/master/v11/specs/message/segment.md#%E5%9B%BE%E7%89%87) 对于发送图片支持绝对路径，网络路径和 Base64 格式。在这里为了简单我们采用 Base64 格式。
+
+此函数会返回被一串 b64 字符表示的图片内容。我们再在 `luciabot/lucia/bot_plugins/group_user_checkin.py` 做出如下的改动：
+```py
+from nonebot import get_bot  # 新
+from nonebot.command import CommandSession
+from nonebot.experimental.plugin import on_command
+from aiocqhttp.message import MessageSegment # aiocqhttp 是 nonebot 的自带依赖
+
+from services.group_user_checkin import group_user_check_in, group_user_check_use_b64img  # 新
+
+...
+
+@on_command('我的签到', aliases={'好感度'}, permission=checkin_permission)
+async def _(session: CommandSession):
+    user_id, group_id = session.event.user_id, session.event.group_id
+    # 使用 bot 对象来主动调用 api
+    nickname = (await get_bot().get_stranger_info(user_id=user_id))['nickname'] # type: ignore
+    im_b64 = await group_user_check_use_b64img(user_id, group_id, nickname)
+    await session.send(MessageSegment.image(f'base64://{im_b64}'), at_sender=True)
+```
+
+`get_bot()` 可以用来获取 NoneBot 的单例对象，可以使用此来调用 OneBot 规定的各种 API，除了获取陌生人信息外，还支持各种其他内容，可以在[这里](https://github.com/howmanybots/onebot/blob/master/v11/specs/api/public.md)看到详细内容。
+
+随后又使用了 aiocqhttp 的消息段构造一条包含图片的消息。官方推荐使用此方法构建消息。
+
+最后我们来看一下效果，可爱吗？
+
+![img](assets/checkin_pic.jpg)
+
+（为了画出找张图我也是煞费了苦心）
+
+此时 `lucia` 目录的结构应为：
+```
+lucia
+├── Dockerfile
+├── bot.py
+├── bot_config.py
+├── bot_plugins/
+│   ├── group_user_checkin.py
+│   ├── ping.py
+│   └── weather.py
+├── models/
+│   └── group_user.py
+├── requirements.txt
+├── resources/
+│   ├── SourceHanSans-Regular.otf
+│   └── group_user_check_bg.png
+├── service_config.py
+└── services/
+    ├── common.py
+    ├── db_context.py
+    ├── group_user_checkin.py
+    ├── log.py
+    ├── processpool.py
+    └── weather.py
+```

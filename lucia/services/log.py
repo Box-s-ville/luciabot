@@ -1,6 +1,7 @@
 import logging
 import sys
 
+from service_config import LOGGING_LEVEL
 
 _handler = logging.StreamHandler(sys.stdout)
 _handler.setFormatter(
@@ -9,4 +10,4 @@ _handler.setFormatter(
 
 logger = logging.getLogger('lucia')
 logger.addHandler(_handler)
-logger.setLevel(logging.INFO)
+logger.setLevel(LOGGING_LEVEL)

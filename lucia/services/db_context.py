@@ -1,7 +1,6 @@
-import os
-
 from gino import Gino
 
+from service_config import DATABASE_URI
 from .log import logger
 
 
@@ -11,8 +10,7 @@ db = Gino()
 
 async def init():
     'Initialise psql database connection. Program must exit before the connection is freed.'
-    uri = os.environ['DATABASE_URI']
-    await db.set_bind(uri)
+    await db.set_bind(DATABASE_URI)
     await db.gino.create_all()
 
     logger.info(f'Database loaded successfully!')

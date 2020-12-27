@@ -2,7 +2,10 @@ FROM python:3.9-alpine3.12
 
 WORKDIR /usr/src/app
 
-RUN apk update && apk add --virtual build-dependencies build-base gcc && apk add tzdata
+RUN apk update \
+    && apk add --virtual build-dependencies build-base gcc \
+    && apk add tzdata \
+    && apk add zlib-dev jpeg-dev libjpeg freetype-dev
 
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
