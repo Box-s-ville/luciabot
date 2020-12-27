@@ -177,14 +177,14 @@ class GroupUser(db.Model):
     user_qq = db.Column(db.BigInteger(), nullable=False)
     belonging_group = db.Column(db.BigInteger(), nullable=False)
 
-    signin_count = db.Column(db.Integer(), nullable=False)
-    signin_time_last = db.Column(db.DateTime(timezone=True), nullable=False)
-    love = db.Column(db.Numeric(scale=3, asdecimal=False), nullable=False)
+    checkin_count = db.Column(db.Integer(), nullable=False)
+    checkin_time_last = db.Column(db.DateTime(timezone=True), nullable=False)
+    impression = db.Column(db.Numeric(scale=3, asdecimal=False), nullable=False)
 
     _idx1 = db.Index('group_users_idx1', 'user_qq', 'belonging_group', unique=True)
 ```
 
-没什么好说的。其中 `love` 是对应用户的签到积分。
+没什么好说的。其中 `impression` 是对应用户的签到积分。
 
 为了方便，创建一个辅助函数用来“确保一个群用户（`GroupUser`）存在”，即如果存在则从数据库找到返回，否则用默认值创建一个新的。
 ```py
@@ -198,13 +198,13 @@ class GroupUser(db.Model):
         return user or await cls.create(
             user_qq=user_qq,
             belonging_group=belonging_group,
-            signin_count=0,
-            signin_time_last=datetime.min, # 从未签到过
-            love=0,
+            checkin_count=0,
+            checkin_time_last=datetime.min, # 从未签到过
+            impression=0,
         )
 ```
 
-接下来就需要实现真正的签到函数了。我们创建文件 `luciabot/lucia/services/group_user_signin.py`，添加以下的内容：
+接下来就需要实现真正的签到函数了。我们创建文件 `luciabot/lucia/services/group_user_checkin.py`，添加以下的内容：
 ```py
 import random
 from datetime import datetime
@@ -214,43 +214,43 @@ from .db_context import db
 from models.group_user import GroupUser
 
 
-async def group_user_sign_in(user_qq: int, group: int) -> str:
-    'Returns string describing the result of signing in'
+async def group_user_check_in(user_qq: int, group: int) -> str:
+    'Returns string describing the result of checking in'
     present = datetime.now()
     async with db.transaction():
         # 取得相应用户
         user = await GroupUser.ensure(user_qq, group)
         # 如果同一天签到过，特殊处理
-        if user.signin_time_last.date() == present.date():
-            return _handle_already_signed_in(user)
-        return await _handle_sign_in(user, present) # ok
+        if user.checkin_time_last.date() == present.date():
+            return _handle_already_checked_in(user)
+        return await _handle_check_in(user, present) # ok
 ```
 
 注意这里我们调用了 ORM model 来取得群聊的用户。使用一个对 `datetime.Date` 对象的比较此用户是不是在相同的一天签到过，如果签到过，则通知用户已经签到过，否则就处理此次签到。
 ```py
 # ...
-def _handle_already_signed_in(user: GroupUser) -> str:
-    return f'已经签到过啦~ 好感度：{user.love:.2f}'
+def _handle_already_checked_in(user: GroupUser) -> str:
+    return f'已经签到过啦~ 好感度：{user.impression:.2f}'
 
 
-async def _handle_sign_in(user: GroupUser, present: datetime) -> str:
-    love_added = random.random()
-    new_love = user.love + love_added
+async def _handle_check_in(user: GroupUser, present: datetime) -> str:
+    impression_added = random.random()
+    new_impression = user.impression + impression_added
     message = random.choice((
         '谢谢，你是个好人！',
         '对了，来喝杯茶吗？',
     ))
 
     await user.update(
-        signin_count=user.signin_count + 1,
-        signin_time_last=present,
-        love=new_love,
+        checkin_count=user.checkin_count + 1,
+        checkin_time_last=present,
+        impression=new_impression,
     ).apply()
 
     # 顺便打印此事件的日志
-    logger.info(f'(USER {user.user_qq}, GROUP {user.belonging_group}) SIGNED IN successfully. score: {new_love:.2f} (+{love_added:.2f}).')
+    logger.info(f'(USER {user.user_qq}, GROUP {user.belonging_group}) CHECKED IN successfully. score: {new_impression:.2f} (+{impression_added:.2f}).')
 
-    return f'{message} 好感度：{new_love:.2f} (+{love_added:.2f})'
+    return f'{message} 好感度：{new_impression:.2f} (+{impression_added:.2f})'
 ```
 在这里生成一个处于 0 和 1 的随机数当作今天的积分值加到此用户并且更新签到日期为今天（所以如果再尝试签到的话就会失败）。仍然产生一个字符串标量返回。
 
@@ -260,12 +260,12 @@ Tip: 如果你想让此服务能被别处调用（例如网页），也可以让
 ```py
 # ...
 async def group_user_check(user_qq: int, group: int) -> str:
-    # heuristic: if users find they have never signed in they are probable to sign in
+    # heuristic: if users find they have never checked in they are probable to check in
     user = await GroupUser.ensure(user_qq, group)
     return '好感度：{:.2f}\n历史签到数：{}\n上次签到日期：{}'.format(
-        user.love,
-        user.signin_count,
-        user.signin_time_last.strftime('%Y-%m-%d') if user.signin_time_last != datetime.min else '从未',
+        user.impression,
+        user.checkin_count,
+        user.checkin_time_last.strftime('%Y-%m-%d') if user.checkin_time_last != datetime.min else '从未',
     )
 ```
 
@@ -274,7 +274,7 @@ async def group_user_check(user_qq: int, group: int) -> str:
 from nonebot.command import CommandSession
 from nonebot.experimental.plugin import on_command
 
-from services.group_user_signin import group_user_sign_in, group_user_check
+from services.group_user_checkin import group_user_check_in, group_user_check
 
 
 __plugin_name__ = '签到'
@@ -286,18 +286,18 @@ __plugin_usage__ = (
 
 
 # 此功能只在群聊有效
-signin_permission = lambda sender: sender.is_groupchat
+checkin_permission = lambda sender: sender.is_groupchat
 
 
-@on_command('签到', permission=signin_permission)
+@on_command('签到', permission=checkin_permission)
 async def _(session: CommandSession):
     await session.send(
-        await group_user_sign_in(session.event.user_id, session.event.group_id),
+        await group_user_check_in(session.event.user_id, session.event.group_id),
         at_sender=True,
     )
 
 
-@on_command('我的签到', aliases={'好感度'}, permission=signin_permission)
+@on_command('我的签到', aliases={'好感度'}, permission=checkin_permission)
 async def _(session: CommandSession):
     await session.send(
         await group_user_check(session.event.user_id, session.event.group_id),
@@ -350,11 +350,16 @@ lucia:
   上次签到日期：2020-11-21
 ```
 
+这是控制台输出的信息：
+```
+lucia       | [2020-12-27 11:18:24,936 lucia] INFO: (USER 123456789, GROUP 12345678) CHECKED IN successfully. score: 0.35 (+0.35).
+```
+
 重复的签到会失败，我们需要等到下一天才能签到下一次。
 
 到这里，我们又完成了一个基于数据库的签到插件+积分系统。如果我们想，可以将此系统集成到其他的服务（插件）中，例如我们可以限制先前定义过的 weather 命令，使其在发送者不合规的情况下返回错误消息：
 ```py
-    if (await GroupUser.ensure(user_qq, group)).love < 50:
+    if (await GroupUser.ensure(user_qq, group)).impression < 50:
         return '我为什么要告诉你这个？'
     return '亲爱的，天气是：' + await get_current_weather_desc(city)
 ```
@@ -374,7 +379,7 @@ luciabot/
     ├── bot.py
     ├── bot_config.py
     ├── bot_plugins/
-    │   ├── group_user_signin.py
+    │   ├── group_user_checkin.py
     │   ├── ping.py
     │   └── weather.py
     ├── models/
@@ -383,7 +388,7 @@ luciabot/
     └── services/
         ├── common.py
         ├── db_context.py
-        ├── group_user_signin.py
+        ├── group_user_checkin.py
         ├── log.py
         └── weather.py
 ```

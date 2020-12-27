@@ -10,9 +10,9 @@ class GroupUser(db.Model):
     user_qq = db.Column(db.BigInteger(), nullable=False)
     belonging_group = db.Column(db.BigInteger(), nullable=False)
 
-    signin_count = db.Column(db.Integer(), nullable=False)
-    signin_time_last = db.Column(db.DateTime(timezone=True), nullable=False)
-    love = db.Column(db.Numeric(scale=3, asdecimal=False), nullable=False)
+    checkin_count = db.Column(db.Integer(), nullable=False)
+    checkin_time_last = db.Column(db.DateTime(timezone=True), nullable=False)
+    impression = db.Column(db.Numeric(scale=3, asdecimal=False), nullable=False)
 
     _idx1 = db.Index('group_users_idx1', 'user_qq', 'belonging_group', unique=True)
 
@@ -25,7 +25,7 @@ class GroupUser(db.Model):
         return user or await cls.create(
             user_qq=user_qq,
             belonging_group=belonging_group,
-            signin_count=0,
-            signin_time_last=datetime.min, # 从未签到过
-            love=0,
+            checkin_count=0,
+            checkin_time_last=datetime.min, # 从未签到过
+            impression=0,
         )
