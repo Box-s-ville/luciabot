@@ -118,7 +118,7 @@ async def init():
         _counts[curr_s + 1 if curr_s != 60 else 0] = 0
         # 把计数消息广播出去，然后等一秒钟再继续这个循环
         # logger.info('reset')  # 取消试试
-        asyncio.create_task(broadcast(lambda i=curr_s: get_count(i)))
+        asyncio.create_task(broadcast(lambda: get_count(curr_s)))
         loop.call_at(int(loop.time()) + 1, _service)
 
     _service()
