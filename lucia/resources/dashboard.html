@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="ie=edge">
+  <title>Luciabot load monitoring</title>
+  <link href="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.0/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-9aIt2nRpC12Uk9gS9baDl411NQApFmC26EwAOH8WgZl5MYYxFfc+NcPb1dKGj7Sk" crossorigin="anonymous"/>
+</head>
+
+<style>
+  html, body { background-color: #cf9f40; }
+</style>
+
+<body>
+  <div id="root"></div>
+
+  <script crossorigin src="https://unpkg.com/react@17/umd/react.development.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@17/umd/react-dom.development.js"></script>
+  <script crossorigin src="https://unpkg.com/react-bootstrap@1.1.0-rc.0/dist/react-bootstrap.js"></script>
+  <script crossorigin src="https://unpkg.com/babel-standalone@6/babel.min.js"></script>
+
+  <script type="text/babel">
+    const Container = ReactBootstrap.Container;
+    const Row = ReactBootstrap.Row;
+    const Card = ReactBootstrap.Card;
+
+    const MyCard = p => (
+      <Card bg={p.bg} text="light" className="m-2"
+            style={{ minWidth: '30vw', minHeight: '30vh', borderWidth: '3px', borderColor: '#e0c795' }}
+      >
+        <Card.Header>{p.header}</Card.Header>
+        <Card.Body className="d-flex align-items-center justify-content-center flex-column">
+          <Card.Title className="w-100 text-center" style={{ fontSize: '1.5rem' }}>
+            {p.children}
+          </Card.Title>
+          <Card.Text>{p.desc}</Card.Text>
+        </Card.Body>
+      </Card>
+    );
+
+    const MessageLoad = p => (
+      <MyCard bg="primary" header="消息负载" desc="表示上一分钟与上一秒内接受的消息数目">
+        {p.data !== null ?
+          <span>{p.data.lastMin} mpm <br /> {p.data.lastSec} mps</span>
+        : 'Loading'}
+      </MyCard>
+    );
+
+    const PluginUsage = p => (
+      <MyCard bg="info" header="插件调用" desc="表示本日插件被成功调用的次数">
+        {p.data !== null ?
+          <table className="w-100" style={{ fontSize: '1.2rem' }}>
+            <tbody>
+              {Array.from(Object.keys(p.data).sort(),
+                name => (
+                  <tr key={name} className="text-light">
+                    <td className="text-left">{name}</td>
+                    <td className="text-center">{p.data[name]}</td>
+                  </tr>
+                )
+              )}
+            </tbody>
+          </table>
+        : 'Loading'}
+      </MyCard>
+    );
+
+    const Dashboard = () => {
+      const [ signal, redo ] = React.useReducer(prev => prev + 1, 0);
+      const [ messageLoad, setMessageLoad ] = React.useState(null);
+      const [ pluginUsage, incPluginUsage ] = React.useReducer((prev, inc) =>
+        // 除了第一次之后接收的都是增量信息
+        prev === null ? inc : {...prev, ...inc}, null
+      );
+
+      React.useEffect(() => {
+        const uri = new URL('/expose', window.location.href);
+        uri.protocol = uri.protocol.replace('http', 'ws');
+        const ws = new WebSocket(uri.toString());
+
+        ws.onopen = () => console.log('Connected to lucia.');
+
+        ws.onclose = () => {
+          console.warn('Connection to lucia dropped. Prepare to retry...');
+          setTimeout(redo, 5000);
+        };
+
+        ws.onmessage = e => {
+          const payload = JSON.parse(e.data);
+          if (payload.type === 'messageLoad')
+            setMessageLoad(payload.data);
+          else if (payload.type === 'pluginUsage')
+            incPluginUsage(payload.data);
+        };
+
+        return () => ws.close();
+      }, [signal]);
+
+      return (
+        <Container className="d-flex align-items-center justify-content-center vh-100">
+          <Row md={3} className="d-flex justify-content-center">
+            <MessageLoad data={messageLoad} />
+            <PluginUsage data={pluginUsage} />
+          </Row>
+        </Container>
+      );
+    };
+
+    ReactDOM.render(
+      <Dashboard />, document.querySelector('#root')
+    );
+  </script>
+</body>
+
+</html>

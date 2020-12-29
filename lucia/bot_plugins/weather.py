@@ -5,6 +5,7 @@ from jieba import posseg
 
 from services.common import ServiceException
 from services.weather import get_current_weather_short, get_current_weather_desc
+from services.command_use_count import record_successful_invocation
 
 
 __plugin_name__ = '天气'
@@ -20,6 +21,7 @@ weather_permission = lambda sender: (not sender.is_privatechat) or sender.is_sup
 
 
 @on_command('weather', aliases=('气温', '天气'), permission=weather_permission)
+@record_successful_invocation('weather')
 async def _(session: CommandSession):
     # 尝试从用户提供的信息中提取参数，如果没有参数，则主动询问
     # 若用户对机器人说“天气”，则此变量为 `['']`
