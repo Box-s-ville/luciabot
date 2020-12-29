@@ -41,7 +41,7 @@ from datetime import timedelta
 SUPERUSERS = { 123456789 }
 # 表示命令的前缀，例如假如命令叫 `天气`，那么只有用户在输入 `/天气` 时候才会触发命令。
 COMMAND_START = { '/' }
-# 表示一条命令的最长处理时间。
+# 表示一条命令的超时（没有用户输入）时间。
 SESSION_EXPIRE_TIMEOUT = timedelta(minutes=2)
 # 服务器和端口
 HOST = '127.0.0.1'
@@ -61,7 +61,7 @@ import bot_config
 
 
 nonebot.init(bot_config)
-# 第一个参数为插件路径，第二个参数为自定义插件前缀
+# 第一个参数为插件路径，第二个参数为插件前缀（模块的前缀）
 nonebot.load_plugins(path.join(path.dirname(__file__), 'bot_plugins'), 'bot_plugins')
 
 # 如果使用 asgi

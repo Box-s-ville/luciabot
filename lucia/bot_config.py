@@ -14,7 +14,7 @@ COMMAND_START = { '' }
 # 机器人昵称，设定后 "@机器人 天气" 和 "lucia 天气" 效果相同。
 NICKNAME = { 'lucia', 'Lucia', '莉西亚' }
 
-# 表示一条命令的最长处理时间。
+# 表示一条命令的超时（没有用户输入）时间。
 SESSION_EXPIRE_TIMEOUT = timedelta(minutes=2)
 
 # 服务器和端口
