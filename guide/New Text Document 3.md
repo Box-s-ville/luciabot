@@ -190,10 +190,13 @@ class GroupUser(db.Model):
 ```py
     # ...
     @classmethod
-    async def ensure(cls, user_qq: int, belonging_group: int) -> 'GroupUser':
-        user = await cls.query.where(
+    async def ensure(cls, user_qq: int, belonging_group: int, for_update: bool = False) -> 'GroupUser':
+        query = cls.query.where(
             (cls.user_qq == user_qq) & (cls.belonging_group == belonging_group)
-        ).gino.first()
+        )
+        if for_update:
+            query = query.with_for_update()
+        user = await query.gino.first()
 
         return user or await cls.create(
             user_qq=user_qq,
@@ -219,7 +222,7 @@ async def group_user_check_in(user_qq: int, group: int) -> str:
     present = datetime.now()
     async with db.transaction():
         # 取得相应用户
-        user = await GroupUser.ensure(user_qq, group)
+        user = await GroupUser.ensure(user_qq, group, for_update=True)
         # 如果同一天签到过，特殊处理
         if user.checkin_time_last.date() == present.date():
             return _handle_already_checked_in(user)

@@ -17,10 +17,13 @@ class GroupUser(db.Model):
     _idx1 = db.Index('group_users_idx1', 'user_qq', 'belonging_group', unique=True)
 
     @classmethod
-    async def ensure(cls, user_qq: int, belonging_group: int) -> 'GroupUser':
-        user = await cls.query.where(
+    async def ensure(cls, user_qq: int, belonging_group: int, for_update: bool = False) -> 'GroupUser':
+        query = cls.query.where(
             (cls.user_qq == user_qq) & (cls.belonging_group == belonging_group)
-        ).gino.first()
+        )
+        if for_update:
+            query = query.with_for_update()
+        user = await query.gino.first()
 
         return user or await cls.create(
             user_qq=user_qq,

@@ -17,7 +17,7 @@ async def group_user_check_in(user_qq: int, group: int) -> str:
     'Returns string describing the result of checking in'
     present = datetime.now()
     async with db.transaction():
-        user = await GroupUser.ensure(user_qq, group)
+        user = await GroupUser.ensure(user_qq, group, for_update=True)
         # 如果同一天签到过，特殊处理
         if user.checkin_time_last.date() == present.date():
             return _handle_already_checked_in(user)
