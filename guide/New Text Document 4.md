@@ -282,7 +282,16 @@ from services.command_use_count import record_successful_invocation
 async def _(session: CommandSession):
     await session.send('pong!')
 ```
-就可以了！每当这个命令完成时，信息就会广播。剩余的天气和签到命令也一样。
+就可以了！每当这个命令完成时，信息就会广播。它和如下片段的效果一致：
+```py
+@on_command(...)
+async def _(session: CommandSession):
+    await session.send('pong!')
+    asyncio.create_task(_post_invocation())
+```
+
+
+剩余的天气和签到命令也一样。
 
 ### 添加路由
 按照 Quart 的教程，创建文件 `luciabot/lucia/controllers.py` 内容如下。
@@ -500,5 +509,194 @@ lucia
 
 有了这个消息队列机制，不仅可以实现上面提及的两个功能，还可以复用这个模块来实现更多的特性。
 
+## grouptty
+
+这次来试着实现一个比较有意思的功能，群消息转发。此功能需要超级用户手动开启，当开启后用户与机器人的聊天窗口就变成了一个 `"tty"`，在此期间该群的聊天会被机器人转发到该聊天。用户可以对机器人说任意话，而后者会转发给该群。
+
+这个插件就要依赖消息的机制，每当有新的群消息来到时要推到队列中，只不过这一次的“客户端”不是 ws 了，而是 NoneBot 与超级用户的私聊。
 
 
+首先我们来用 `message_preprocessor` 捕获所有的群聊消息：
+
+`luciabot/lucia/bot_plugins/grouptty.py`
+```py
+# 一大堆 import
+import asyncio
+from typing import Dict, Tuple
+from nonebot import message_preprocessor
+from nonebot.message import CQEvent
+from nonebot.command import CommandSession
+from nonebot.helpers import context_id
+from nonebot.exceptions import CQHttpError
+from nonebot.experimental.plugin import on_command
+
+from services.command_use_count import record_successful_invocation
+from services.broadcast import broadcast, listen_to_broadcasts, TPayload
+
+
+__plugin_name__ = 'grouptty'
+__plugin_usage__ = (
+    '用法：对我说 "grouptty" 查看当前的 tty 信息。\n'
+    '对我说 "grouptty [群号]" 接入该群聊天。\n'
+    '在此期间该群的聊天会被我转发到这里。\n'
+    '你可以说 "grouptty.send [消息]" 来向此群发送消息。\n'
+    '期间发送 "grouptty.end" 结束当前 tty。'
+)
+
+
+# 收到群聊消息时要广播一下
+# 没错我们可以定义多个消息预处理器
+@message_preprocessor
+async def _(bot, event: CQEvent, manager):
+    if not event.group_id:
+        return
+
+    async def _bc() -> TPayload:
+        return {
+            # 订阅的群组
+            'type': f'grouptty-{event.group_id}',
+            'data': {
+                'message': event.message,
+                'user_id': event.user_id,
+                'name': event.sender['card'] or event.sender['nickname'],
+            },
+        }
+
+    asyncio.create_task(broadcast(_bc))
+```
+
+像刚才的消息计数一样这是很平常的消息预处理器。当群消息来到时我们动态生成一个 `"type"` 字段来避免和别的种类消息混淆。这里的 `"type"` 字段为群号。
+
+这是首个本教程中稍微复杂的插件例子。如同上面代码中的注释所讲，它有 3 个子命令，分别为 `grouptty`, `grouptty.end` 和 `grouptty.send`。前两个子命令的实现如下：
+```py
+# ...
+
+grouptty_permission = lambda sender: sender.is_superuser
+
+# tty 发起者的 context（即 qq 号码 + 发起者群号（如果有）生成的唯一 ID） 值为相应的群号和从广播提取消息的循环
+_ttys: Dict[str, Tuple[int, asyncio.Task]] = {}
+
+
+@on_command('grouptty', permission=grouptty_permission)
+@record_successful_invocation('grouptty')
+async def _(session: CommandSession):
+    # 如果用户已经有一个链接，就提示
+    if (pair := _ttys.get(context_id(session.event))) is not None:
+        await session.send(f'grouptty: 目前已经在监听群 {pair[0]}')
+        return
+
+    bot, event = session.bot, session.event
+    group: str = session.current_arg_text.strip()
+    # 如果用户不提供群号，就发送机器人所在的群列表
+    if not group:
+        available_groups = await bot.get_group_list()
+        await session.send(
+            'grouptty: 可以监听的群: ' +
+            ', '.join(f"{g['group_id']}" for g in available_groups)
+        )
+        return
+
+    async def _receive():
+        # 订阅的群组
+        with listen_to_broadcasts(f'grouptty-{group}') as get:
+            while True:
+                ev = (await get())['data']
+                # 转发消息给当前会话
+                await bot.send(event, f'grouptty: {ev["user_id"]} ({ev["name"]}): {ev["message"]}')
+
+    _ttys[context_id(session.event)] = (int(group), asyncio.create_task(_receive()))
+    await session.send('grouptty: 开始')
+
+
+@on_command(('grouptty', 'end'), permission=grouptty_permission)
+async def _(session: CommandSession):
+    if (pair := _ttys.pop(context_id(session.event), None)) is not None:
+        pair[1].cancel()
+        await session.send('grouptty: 结束')
+    else:
+        await session.send('grouptty: 当前没有接入群聊！')
+```
+
+在这里注意几点：
+* 代码使用了一个全局变量来追踪用户和其对应的 tty session。当用户开始新连接时，我们就创建一个死循环执行类似以往的从队列中提取消息的任务。当用户想要停止时，我们就结束它。
+* 我给 `on_command` 中传递了一个元组，这代表给命令起了一个前缀。
+* `context_id` 用来计算一个代表发送者身份的 ID。这表示每一个发送者只能接入一个 tty。
+
+这是主动向群聊发送消息的命令：
+```py
+# ...
+
+@on_command(('grouptty', 'send'), permission=grouptty_permission)
+@record_successful_invocation('grouptty.send')
+async def _(session: CommandSession):
+    if (pair := _ttys.get(context_id(session.event))) is not None:
+        msg = session.current_arg or await session.aget(prompt='grouptty>')
+        try:
+            await session.bot.send_group_msg(group_id=pair[0], message=msg)
+        except CQHttpError:
+            await session.send('grouptty: 发送失败！')
+    else:
+        await session.send('grouptty: 当前没有接入群聊！')
+```
+
+在这个例子里，`session.bot` 也可以获取 `NoneBot` 的单例。形如 `weather` 命令一样，我们向用户接收参数，此参数会被当作消息发送给目标的群聊。
+
+注意到这个插件里我也用到了上面定义的计数用装饰器。
+
+打开 `luciabot/lucia/bot_config.py`，添加如下的配置项：
+```py
+# ...
+
+# 当命令名为元组时，使用如下的分隔符来分割命令。
+COMMAND_SEP = { '.' }
+
+# ...
+```
+
+运行机器人，看一下它的效果：
+
+我与 lucia 的私聊
+```
+我:
+  grouptty
+lucia:
+  grouptty: 可以监听的群: 12345678, 87654321
+我:
+  grouptty 12345678
+lucia:
+  grouptty: 开始
+我:
+  grouptty.send 有人吗
+lucia:
+  grouptty: 123456789 (person a): 有人
+lucia:
+  grouptty: 1234567890 (misaka mikoto): 何か
+我:
+  grouptty
+lucia:
+  grouptty: 目前已经在监听群 12345678
+我:
+  ping
+lucia:
+  pong!
+我:
+  grouptty.end
+lucia:
+  grouptty: 结束
+```
+
+群 12345678 的聊天记录
+```
+lucia:
+  有人吗
+person a:
+  有人
+misaka mikoto:
+  何か
+```
+
+（其中群号与 qq 号均为示例）
+
+一定要记得不用的时候使用 `grouptty.end` 停止监控！
+
+在这里为了展示我们转发的是群信息，在其他应用里我们可以转发诸如服务器的 systemd，其他平台的聊天记录等信息。

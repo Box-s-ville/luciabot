@@ -11,6 +11,9 @@ SUPERUSERS = { 123456789 }
 # 我们不使用命令前缀
 COMMAND_START = { '' }
 
+# 当命令名为元组时，使用如下的分隔符来分割命令。
+COMMAND_SEP = { '.' }
+
 # 机器人昵称，设定后 "@机器人 天气" 和 "lucia 天气" 效果相同。
 NICKNAME = { 'lucia', 'Lucia', '莉西亚' }
 
