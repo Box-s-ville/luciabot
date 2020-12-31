@@ -23,8 +23,8 @@ from typing import Any, Awaitable, Callable, Dict, Generator, Set
 
 # 约定所有通过队列的消息都要遵从此格式
 # {
-#   type: str,
-#   data: { [k: string]: any },
+#   type: string,
+#   data: any,
 # }
 TPayload = Dict[str, Any]
 
@@ -44,15 +44,20 @@ def listen_to_broadcasts(*types: str) -> Generator[Callable[[], Awaitable[TPaylo
         _listeners.pop(queue)
 
 
-async def broadcast(payload_lazy: Callable[[], Awaitable[TPayload]]):
-    'Broadcast messages to all current subscribers.'
-    if _listeners:
-        payload = await payload_lazy()
-        await asyncio.gather(*[
-            queue.put(payload)
-            for queue, types in _listeners.items()
-            if payload['type'] in types
-        ])
+async def broadcast(type_: str, data_lazy: Callable[[], Awaitable[Any]]):
+    'Tag and broadcast messages to all current subscribers.'
+    qs = [queue for queue, types in _listeners.items() if type_ in types]
+    if qs:
+        payload = as_payload(type_, await data_lazy())
+        await asyncio.gather(*[queue.put(payload) for queue in qs])
+
+
+def as_payload(type_: str, data: Any) -> TPayload:
+    'Wrap a result into a payload.'
+    return {
+        'type': type_, 'data': data
+    }
+
 ```
 [Quart](https://pgjones.gitlab.io/quart/tutorials/websocket_tutorial.html) 官网建议使用装饰器实现订阅，在这里使用 with 也一样。这里包含第一个功能：当有新的客户端连接时，需要调用 `listen_to_broadcasts` 来生成对应的消息队列并返回给调用者，从此以后所有的广播都会传递到此队列，这时候只需要
 ```py
@@ -61,7 +66,9 @@ with listen_to_broadcasts('desired_msg_type') as get_msg:
 ```
 就可以及时的获取这条新消息。使用 with 确保了我们可以当不需要时候，及时移除队列。
 
-同时模块还要提供另一个方法：`broadcast`，当有人需要广播消息时，只需要调用此方法把消息放入所有的队列中即可。要传递的参数是惰性求值的，因为当没有监听者的时候我们不需要传递任何信息。
+同时模块还要提供另一个方法：`broadcast`，当有人需要广播消息时，只需要调用此方法把消息放入所有的队列中即可。要传递的参数是惰性求值的，因为当没有对应类型的监听者的时候我们不需要传递任何信息。一会儿我们会看到如何去使用它。
+
+`as_payload` 用来将一个值打上对应的 `type`。
 
 这就是本模块的全部。
 
@@ -77,9 +84,9 @@ with listen_to_broadcasts('desired_msg_type') as get_msg:
 ```py
 import asyncio
 from datetime import datetime
-from typing import Optional
+from typing import Dict, Optional
 
-from .broadcast import TPayload, broadcast
+from .broadcast import broadcast
 from .log import logger
 
 
@@ -92,16 +99,13 @@ def _get_offset() -> int:
     return int((datetime.now() - _epoch).total_seconds()) % 61
 
 
-async def get_count(curr_s: Optional[int] = None) -> TPayload:
+async def get_count(curr_s: Optional[int] = None) -> Dict[str, int]:
     'Gets report that counts number of messages received in last 60s and last second.'
     if curr_s is None:
         curr_s = _get_offset()
     return {
-        'type': 'messageLoad',
-        'data': {
-            'lastMin': sum(_counts),
-            'lastSec': _counts[curr_s - 1], # note [-1] indexes to [60]!
-        },
+        'lastMin': sum(_counts),
+        'lastSec': _counts[curr_s - 1], # note [-1] indexes to [60]!
     }
 
 
@@ -118,7 +122,7 @@ async def init():
         _counts[curr_s + 1 if curr_s != 60 else 0] = 0
         # 把计数消息广播出去，然后等一秒钟再继续这个循环
         # logger.info('reset')  # 取消试试
-        asyncio.create_task(broadcast(lambda: get_count(curr_s)))
+        asyncio.create_task(broadcast('messageLoad', lambda: get_count(curr_s)))
         loop.call_at(int(loop.time()) + 1, _service)
 
     _service()
@@ -126,6 +130,19 @@ async def init():
 ```
 
 细节不过多考虑。这个模块有三个方法：`get_count` 用来主动获取数据，`increase_now` 用来将数组内当前秒数的数字加一，`init` 就像先前在数据库中看到的一样，产生一个清理 + 广播的定时任务。
+
+这里使用了先前提到的 `broadcast`。假设 `get_count()` 返回的值如下：
+```json
+{ "lastMin": 17, "lastSec": 0 }
+```
+则被广播的实际消息如下：
+```json
+{
+    "type": "messageLoad",
+    "data": { "lastMin": 17, "lastSec": 0 }
+}
+```
+ws 客户端就可以分辨消息种类。
 
 Tip: 可以使用 [apscheduler](https://apscheduler.readthedocs.io/en/stable/) 库来实现此功能。
 
@@ -206,34 +223,28 @@ from functools import wraps
 from typing import Awaitable, Callable, Dict, TypeVar
 
 from .db_context import db
-from .broadcast import TPayload, broadcast
+from .broadcast import broadcast
 from models.command_use import CommandUse
 
 
 _base_count: Dict[str, int] = {}
 
 
-async def get_count() -> TPayload:
+async def get_count() -> Dict[str, int]:
     'Gets all command use counts from the database for today.'
     today = datetime.datetime.today().date()
     re = await CommandUse \
         .select('name', 'use_count') \
         .where(CommandUse.date == today) \
         .gino.all()
-    return {
-        'type': 'pluginUsage',
-        'data': _base_count | { pair['name']: pair['use_count'] for pair in re }
-    }
+    return _base_count | { pair['name']: pair['use_count'] for pair in re }
 ```
 其中 `_base_count` 用来记录所有的命令名字（和其初始值 0）。当本日命令没有被调用时，上面的查询不会返回结果，所以我们需要这个信息兜底。
 
 这是装饰器：
 ```py
-async def _get_count_incremental(usedata: CommandUse) -> TPayload:
-    return {
-        'type': 'pluginUsage',
-        'data': { usedata.name: usedata.use_count }
-    }
+async def _get_count_incremental(usedata: CommandUse) -> Dict[str, int]:
+    return { usedata.name: usedata.use_count }
 
 
 _TAsyncFunction = TypeVar('_TAsyncFunction', bound=Callable[..., Awaitable])
@@ -252,7 +263,7 @@ def record_successful_invocation(keyname: str):
             usedata = await CommandUse.ensure(keyname, today, for_update=True)
             await usedata.update(use_count=usedata.use_count + 1).apply()
         # 仅广播增量信息！
-        await broadcast(lambda: _get_count_incremental(usedata))
+        await broadcast('pluginUsage', lambda: _get_count_incremental(usedata))
 
     def decorator(f: _TAsyncFunction) -> _TAsyncFunction:
         @wraps(f)
@@ -296,31 +307,31 @@ async def _(session: CommandSession):
 ### 添加路由
 按照 Quart 的教程，创建文件 `luciabot/lucia/controllers.py` 内容如下。
 ```py
-import json
+from json import dumps
+
 from quart import Quart, websocket, send_file
 
 from service_config import RESOURCES_DIR
 from services import command_use_count, inmsg_count
-from services.broadcast import listen_to_broadcasts
+from services.broadcast import listen_to_broadcasts, as_payload
 
 
 def add_controllers(app: Quart):
 
     @app.route('/dashboard', ['GET'])
     async def _dashboard_get():
-        # 这个文件现在还没创建，一会儿再说
         return await send_file(f'{RESOURCES_DIR}/dashboard.html')
 
     @app.websocket('/expose')
     async def _expose_ws():
-        # 主动调用 API，填充完整的命令调用信息 (bootstrap)
-        await websocket.send(json.dumps(await inmsg_count.get_count()))
-        await websocket.send(json.dumps(await command_use_count.get_count()))
+        # 主动调用 API，打上类型标签，填充完整的命令调用信息 (bootstrap)
+        await websocket.send(dumps(as_payload('messageLoad', await inmsg_count.get_count())))
+        await websocket.send(dumps(as_payload('pluginUsage', await command_use_count.get_count())))
         # 然后再接入消息队列被动获取信息
         with listen_to_broadcasts('messageLoad', 'pluginUsage') as get:
             while True:
                 payload = await get()
-                await websocket.send(json.dumps(payload))
+                await websocket.send(dumps(payload))
 ```
 在这里暴露了一个 ws 接口，当客户端链接的时候首先推送上面两个全量的统计信息，然后再接入消息队列，当有消息的时候推送给客户端。
 
@@ -531,7 +542,7 @@ from nonebot.exceptions import CQHttpError
 from nonebot.experimental.plugin import on_command
 
 from services.command_use_count import record_successful_invocation
-from services.broadcast import broadcast, listen_to_broadcasts, TPayload
+from services.broadcast import broadcast, listen_to_broadcasts
 
 
 __plugin_name__ = 'grouptty'
@@ -551,18 +562,14 @@ async def _(bot, event: CQEvent, manager):
     if not event.group_id:
         return
 
-    async def _bc() -> TPayload:
+    async def _bc():
         return {
-            # 订阅的群组
-            'type': f'grouptty-{event.group_id}',
-            'data': {
-                'message': event.message,
-                'user_id': event.user_id,
-                'name': event.sender['card'] or event.sender['nickname'],
-            },
+            'message': event.message,
+            'user_id': event.user_id,
+            'name': event.sender['card'] or event.sender['nickname'],
         }
-
-    asyncio.create_task(broadcast(_bc))
+                                  # 订阅的群组
+    asyncio.create_task(broadcast(f'grouptty-{event.group_id}', _bc))
 ```
 
 像刚才的消息计数一样这是很平常的消息预处理器。当群消息来到时我们动态生成一个 `"type"` 字段来避免和别的种类消息混淆。这里的 `"type"` 字段为群号。
@@ -699,4 +706,4 @@ misaka mikoto:
 
 一定要记得不用的时候使用 `grouptty.end` 停止监控！
 
-在这里为了展示我们转发的是群信息，在其他应用里我们可以转发诸如服务器的 systemd，其他平台的聊天记录等信息。
+在这里为了展示我们转发的是群信息，在其他应用里我们可以转发诸如服务器的 systemd，其他平台的聊天记录等信息。有一个合理的消息广播机制可以更好地实现跨模块沟通。

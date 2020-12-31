@@ -1,8 +1,8 @@
 import asyncio
 from datetime import datetime
-from typing import Optional
+from typing import Dict, Optional
 
-from .broadcast import TPayload, broadcast
+from .broadcast import broadcast
 from .log import logger
 
 
@@ -15,16 +15,13 @@ def _get_offset() -> int:
     return int((datetime.now() - _epoch).total_seconds()) % 61
 
 
-async def get_count(curr_s: Optional[int] = None) -> TPayload:
+async def get_count(curr_s: Optional[int] = None) -> Dict[str, int]:
     'Gets report that counts number of messages received in last 60s and last second.'
     if curr_s is None:
         curr_s = _get_offset()
     return {
-        'type': 'messageLoad',
-        'data': {
-            'lastMin': sum(_counts),
-            'lastSec': _counts[curr_s - 1], # note [-1] indexes to [60]!
-        },
+        'lastMin': sum(_counts),
+        'lastSec': _counts[curr_s - 1], # note [-1] indexes to [60]!
     }
 
 
@@ -41,7 +38,7 @@ async def init():
         _counts[curr_s + 1 if curr_s != 60 else 0] = 0
         # 把计数消息广播出去，然后等一秒钟再继续这个循环
         # logger.info('reset')  # 取消试试
-        asyncio.create_task(broadcast(lambda: get_count(curr_s)))
+        asyncio.create_task(broadcast('messageLoad', lambda: get_count(curr_s)))
         loop.call_at(int(loop.time()) + 1, _service)
 
     _service()

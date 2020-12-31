@@ -5,8 +5,8 @@ from typing import Any, Awaitable, Callable, Dict, Generator, Set
 
 # 约定所有通过队列的消息都要遵从此格式
 # {
-#   type: str,
-#   data: { [k: string]: any },
+#   type: string,
+#   data: any,
 # }
 TPayload = Dict[str, Any]
 
@@ -26,12 +26,16 @@ def listen_to_broadcasts(*types: str) -> Generator[Callable[[], Awaitable[TPaylo
         _listeners.pop(queue)
 
 
-async def broadcast(payload_lazy: Callable[[], Awaitable[TPayload]]):
-    'Broadcast messages to all current subscribers.'
-    if _listeners:
-        payload = await payload_lazy()
-        await asyncio.gather(*[
-            queue.put(payload)
-            for queue, types in _listeners.items()
-            if payload['type'] in types
-        ])
+async def broadcast(type_: str, data_lazy: Callable[[], Awaitable[Any]]):
+    'Tag and broadcast messages to all current subscribers.'
+    qs = [queue for queue, types in _listeners.items() if type_ in types]
+    if qs:
+        payload = as_payload(type_, await data_lazy())
+        await asyncio.gather(*[queue.put(payload) for queue in qs])
+
+
+def as_payload(type_: str, data: Any) -> TPayload:
+    'Wrap a result into a payload.'
+    return {
+        'type': type_, 'data': data
+    }

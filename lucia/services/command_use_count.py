@@ -4,31 +4,25 @@ from functools import wraps
 from typing import Awaitable, Callable, Dict, TypeVar
 
 from .db_context import db
-from .broadcast import TPayload, broadcast
+from .broadcast import broadcast
 from models.command_use import CommandUse
 
 
 _base_count: Dict[str, int] = {}
 
 
-async def get_count() -> TPayload:
+async def get_count() -> Dict[str, int]:
     'Gets all command use counts from the database for today.'
     today = datetime.datetime.today().date()
     re = await CommandUse \
         .select('name', 'use_count') \
         .where(CommandUse.date == today) \
         .gino.all()
-    return {
-        'type': 'pluginUsage',
-        'data': _base_count | { pair['name']: pair['use_count'] for pair in re }
-    }
+    return _base_count | { pair['name']: pair['use_count'] for pair in re }
 
 
-async def _get_count_incremental(usedata: CommandUse) -> TPayload:
-    return {
-        'type': 'pluginUsage',
-        'data': { usedata.name: usedata.use_count }
-    }
+async def _get_count_incremental(usedata: CommandUse) -> Dict[str, int]:
+    return { usedata.name: usedata.use_count }
 
 
 _TAsyncFunction = TypeVar('_TAsyncFunction', bound=Callable[..., Awaitable])
@@ -47,7 +41,7 @@ def record_successful_invocation(keyname: str):
             usedata = await CommandUse.ensure(keyname, today, for_update=True)
             await usedata.update(use_count=usedata.use_count + 1).apply()
         # 仅广播增量信息！
-        await broadcast(lambda: _get_count_incremental(usedata))
+        await broadcast('pluginUsage', lambda: _get_count_incremental(usedata))
 
     def decorator(f: _TAsyncFunction) -> _TAsyncFunction:
         @wraps(f)

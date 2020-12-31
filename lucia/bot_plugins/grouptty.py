@@ -8,7 +8,7 @@ from nonebot.exceptions import CQHttpError
 from nonebot.experimental.plugin import on_command
 
 from services.command_use_count import record_successful_invocation
-from services.broadcast import broadcast, listen_to_broadcasts, TPayload
+from services.broadcast import broadcast, listen_to_broadcasts
 
 
 __plugin_name__ = 'grouptty'
@@ -28,18 +28,14 @@ async def _(bot, event: CQEvent, manager):
     if not event.group_id:
         return
 
-    async def _bc() -> TPayload:
+    async def _bc():
         return {
-            # 订阅的群组
-            'type': f'grouptty-{event.group_id}',
-            'data': {
-                'message': event.message,
-                'user_id': event.user_id,
-                'name': event.sender['card'] or event.sender['nickname'],
-            },
+            'message': event.message,
+            'user_id': event.user_id,
+            'name': event.sender['card'] or event.sender['nickname'],
         }
-
-    asyncio.create_task(broadcast(_bc))
+                                  # 订阅的群组
+    asyncio.create_task(broadcast(f'grouptty-{event.group_id}', _bc))
 
 
 grouptty_permission = lambda sender: sender.is_superuser
