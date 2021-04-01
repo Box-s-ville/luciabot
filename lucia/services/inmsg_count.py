@@ -1,6 +1,6 @@
 import asyncio
 from datetime import datetime
-from typing import Dict, Optional
+from typing import Optional
 
 from .broadcast import broadcast
 from .log import logger
@@ -15,7 +15,7 @@ def _get_offset() -> int:
     return int((datetime.now() - _epoch).total_seconds()) % 61
 
 
-async def get_count(curr_s: Optional[int] = None) -> Dict[str, int]:
+async def get_count(curr_s: Optional[int] = None) -> dict[str, int]:
     'Gets report that counts number of messages received in last 60s and last second.'
     if curr_s is None:
         curr_s = _get_offset()

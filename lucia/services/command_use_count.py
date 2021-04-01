@@ -1,17 +1,17 @@
 import asyncio
 import datetime
 from functools import wraps
-from typing import Awaitable, Callable, Dict, TypeVar
+from typing import Awaitable, Callable, TypeVar
 
 from .db_context import db
 from .broadcast import broadcast
 from models.command_use import CommandUse
 
 
-_base_count: Dict[str, int] = {}
+_base_count: dict[str, int] = {}
 
 
-async def get_count() -> Dict[str, int]:
+async def get_count() -> dict[str, int]:
     'Gets all command use counts from the database for today.'
     today = datetime.datetime.today().date()
     re = await CommandUse \
@@ -21,7 +21,7 @@ async def get_count() -> Dict[str, int]:
     return _base_count | { pair['name']: pair['use_count'] for pair in re }
 
 
-async def _get_count_incremental(usedata: CommandUse) -> Dict[str, int]:
+async def _get_count_incremental(usedata: CommandUse) -> dict[str, int]:
     return { usedata.name: usedata.use_count }
 
 

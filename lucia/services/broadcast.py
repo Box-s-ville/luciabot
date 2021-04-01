@@ -1,6 +1,6 @@
 import asyncio
 from contextlib import contextmanager
-from typing import Any, Awaitable, Callable, Dict, Generator, Set
+from typing import Any, Awaitable, Callable, Generator
 
 
 # 约定所有通过队列的消息都要遵从此格式
@@ -8,11 +8,11 @@ from typing import Any, Awaitable, Callable, Dict, Generator, Set
 #   type: string,
 #   data: any,
 # }
-TPayload = Dict[str, Any]
+TPayload = dict[str, Any]
 
 # 目前存在的消息队列，一个客户（websocket 连接）对应着一个队列
 # 键为队列，值为所监听的消息类型
-_listeners: Dict[asyncio.Queue[TPayload], Set[str]] = {}
+_listeners: dict[asyncio.Queue[TPayload], set[str]] = {}
 
 
 @contextmanager

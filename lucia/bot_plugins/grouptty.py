@@ -1,5 +1,4 @@
 import asyncio
-from typing import Dict, Tuple
 from nonebot import message_preprocessor
 from nonebot.message import CQEvent
 from nonebot.command import CommandSession
@@ -41,7 +40,7 @@ async def _(bot, event: CQEvent, manager):
 grouptty_permission = lambda sender: sender.is_superuser
 
 # tty 发起者的 context（即 qq 号码 + 发起者群号（如果有）生成的唯一 ID） 值为相应的群号和从广播提取消息的循环
-_ttys: Dict[str, Tuple[int, asyncio.Task]] = {}
+_ttys: dict[str, tuple[int, asyncio.Task]] = {}
 
 
 @on_command('grouptty', permission=grouptty_permission)

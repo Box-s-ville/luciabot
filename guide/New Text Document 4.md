@@ -18,7 +18,7 @@
 ```py
 import asyncio
 from contextlib import contextmanager
-from typing import Any, Awaitable, Callable, Dict, Generator, Set
+from typing import Any, Awaitable, Callable, Generator
 
 
 # 约定所有通过队列的消息都要遵从此格式
@@ -26,11 +26,11 @@ from typing import Any, Awaitable, Callable, Dict, Generator, Set
 #   type: string,
 #   data: any,
 # }
-TPayload = Dict[str, Any]
+TPayload = dict[str, Any]
 
 # 目前存在的消息队列，一个客户（websocket 连接）对应着一个队列
 # 键为队列，值为所监听的消息类型
-_listeners: Dict[asyncio.Queue[TPayload], Set[str]] = {}
+_listeners: dict[asyncio.Queue[TPayload], set[str]] = {}
 
 
 @contextmanager
@@ -84,7 +84,7 @@ with listen_to_broadcasts('desired_msg_type') as get_msg:
 ```py
 import asyncio
 from datetime import datetime
-from typing import Dict, Optional
+from typing import Optional
 
 from .broadcast import broadcast
 from .log import logger
@@ -99,7 +99,7 @@ def _get_offset() -> int:
     return int((datetime.now() - _epoch).total_seconds()) % 61
 
 
-async def get_count(curr_s: Optional[int] = None) -> Dict[str, int]:
+async def get_count(curr_s: Optional[int] = None) -> dict[str, int]:
     'Gets report that counts number of messages received in last 60s and last second.'
     if curr_s is None:
         curr_s = _get_offset()
@@ -220,17 +220,17 @@ class CommandUse(db.Model):
 import asyncio
 import datetime
 from functools import wraps
-from typing import Awaitable, Callable, Dict, TypeVar
+from typing import Awaitable, Callable, TypeVar
 
 from .db_context import db
 from .broadcast import broadcast
 from models.command_use import CommandUse
 
 
-_base_count: Dict[str, int] = {}
+_base_count: dict[str, int] = {}
 
 
-async def get_count() -> Dict[str, int]:
+async def get_count() -> dict[str, int]:
     'Gets all command use counts from the database for today.'
     today = datetime.datetime.today().date()
     re = await CommandUse \
@@ -243,7 +243,7 @@ async def get_count() -> Dict[str, int]:
 
 这是装饰器：
 ```py
-async def _get_count_incremental(usedata: CommandUse) -> Dict[str, int]:
+async def _get_count_incremental(usedata: CommandUse) -> dict[str, int]:
     return { usedata.name: usedata.use_count }
 
 
@@ -533,7 +533,6 @@ lucia
 ```py
 # 一大堆 import
 import asyncio
-from typing import Dict, Tuple
 from nonebot import message_preprocessor
 from nonebot.message import CQEvent
 from nonebot.command import CommandSession
@@ -581,7 +580,7 @@ async def _(bot, event: CQEvent, manager):
 grouptty_permission = lambda sender: sender.is_superuser
 
 # tty 发起者的 context（即 qq 号码 + 发起者群号（如果有）生成的唯一 ID） 值为相应的群号和从广播提取消息的循环
-_ttys: Dict[str, Tuple[int, asyncio.Task]] = {}
+_ttys: dict[str, tuple[int, asyncio.Task]] = {}
 
 
 @on_command('grouptty', permission=grouptty_permission)
