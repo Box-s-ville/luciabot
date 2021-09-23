@@ -538,7 +538,7 @@ from nonebot.message import CQEvent
 from nonebot.command import CommandSession
 from nonebot.helpers import context_id
 from nonebot.exceptions import CQHttpError
-from nonebot.experimental.plugin import on_command
+from nonebot.plugin import on_command
 
 from services.command_use_count import record_successful_invocation
 from services.broadcast import broadcast, listen_to_broadcasts

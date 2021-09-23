@@ -13,7 +13,7 @@ NoneBot 过去是基于 酷Q 和 CQHttp 插件的机器人框架。可以理解�
 不过在这之后出现了 [OneBot](https://github.com/howmanybots/onebot) “标准”，提供和 CQHttp 类似的 api 规则。很多现在的机器人“后端”都可以遵循此标准，例如 go-cqhttp 和 mirai native 等。所以选择对的后端对实际上开发没有太大的影响。比如 go-cqhttp，可以当作 酷Q 的"drop-in replacement"。
 
 ## 开始使用 Nonebot
-首先使用 pip 安装 nonebot （截至此稿完成最新版本为 1.8.0）：
+首先使用 pip 安装 nonebot （截至此稿<del>完成</del>更新最新版本为 1.9.0）：
 ```sh
 $ pip install nonebot
 ```
@@ -78,7 +78,7 @@ if __name__ == '__main__':
 以上的启动文件会设置为加载 `lucia/bot_plugin` 下的所有插件。一个插件的定义如下：可以是一个 `.py` 文件，或者可以是一个文件夹，其中包含 `__init__.py` 入口文件。我们第一个插件选择的是前者的简单方式。打开先前创建的 `luciabot/lucia/bot_plugins/ping.py` 文件，添加如下代码：
 ```python
 from nonebot.command import CommandSession
-from nonebot.experimental.plugin import on_command
+from nonebot.plugin import on_command
 
 
 __plugin_name__ = 'ping'

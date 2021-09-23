@@ -1,5 +1,5 @@
 from nonebot.command import CommandSession
-from nonebot.experimental.plugin import on_command
+from nonebot.plugin import on_command
 
 from services.command_use_count import record_successful_invocation
 

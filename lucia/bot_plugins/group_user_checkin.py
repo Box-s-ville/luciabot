@@ -1,6 +1,6 @@
 from nonebot import get_bot
 from nonebot.command import CommandSession
-from nonebot.experimental.plugin import on_command
+from nonebot.plugin import on_command
 from aiocqhttp.message import MessageSegment
 
 from services.group_user_checkin import group_user_check_in, group_user_check, group_user_check_use_b64img

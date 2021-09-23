@@ -1,6 +1,6 @@
 from nonebot.command import CommandSession
 from nonebot.natural_language import NLPSession, IntentCommand
-from nonebot.experimental.plugin import on_command, on_natural_language
+from nonebot.plugin import on_command, on_natural_language
 from jieba import posseg
 
 from services.common import ServiceException

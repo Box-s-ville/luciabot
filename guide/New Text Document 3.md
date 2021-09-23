@@ -42,8 +42,8 @@ Tip: 在这里我们没有直接运行 `bot.py` 而是使用了 asgi app（因�
 
 在相同的目录下创建 `requirements.txt`：
 ```
-nonebot==1.8.0
-hypercorn==0.11.1
+nonebot==1.9.0
+hypercorn==0.11.2
 jieba==0.42.1
 gino==1.0.1
 ```
@@ -275,7 +275,7 @@ async def group_user_check(user_qq: int, group: int) -> str:
 最后创建 NoneBot 的命令处理器：
 ```py
 from nonebot.command import CommandSession
-from nonebot.experimental.plugin import on_command
+from nonebot.plugin import on_command
 
 from services.group_user_checkin import group_user_check_in, group_user_check
 
@@ -415,7 +415,7 @@ luciabot/
 `requirements.txt` 中添加如下一行安装 Pillow：
 ```diff
   ...
-+ Pillow==8.0.1
++ Pillow==8.3.2
 ```
 
 创建 `luciabot/lucia/resources` 文件夹，拷贝如下两个用于绘图的文件：
@@ -530,7 +530,7 @@ def _create_user_check_b64img(user_name: str, user: GroupUser) -> str:
 ```py
 from nonebot import get_bot  # 新
 from nonebot.command import CommandSession
-from nonebot.experimental.plugin import on_command
+from nonebot.plugin import on_command
 from aiocqhttp.message import MessageSegment # aiocqhttp 是 nonebot 的自带依赖
 
 from services.group_user_checkin import group_user_check_in, group_user_check_use_b64img  # 新

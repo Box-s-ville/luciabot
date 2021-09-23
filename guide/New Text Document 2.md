@@ -122,7 +122,7 @@ async def get_current_weather_short(city: str) -> str:
 为了使用这个刚定义的服务，我们也来像之前的 ping 插件一样，也来写一个命令插件。新建文件 `luciabot/lucia/bot_plugins/weather.py` 加入如下内容：
 ```py
 from nonebot.command import CommandSession
-from nonebot.experimental.plugin import on_command
+from nonebot.plugin import on_command
 
 from services.common import ServiceException
 from services.weather import get_current_weather_short
@@ -298,7 +298,7 @@ $ pip install jieba
 ```py
 # ... 略
 from nonebot.natural_language import NLPSession, IntentCommand
-from nonebot.experimental.plugin import on_command, on_natural_language
+from nonebot.plugin import on_command, on_natural_language
 from jieba import posseg
 
 # ... 略
