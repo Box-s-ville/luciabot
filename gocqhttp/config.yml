@@ -1,0 +1,51 @@
+account:
+  uin: 11111111 
+  password: '123456'
+  encrypt: false
+  status: 0
+  relogin:
+    delay: 3
+    interval: 3
+    max-times: 0
+  use-sso-address: true
+
+heartbeat:
+  interval: 5
+
+message:
+  post-format: string
+  ignore-invalid-cqcode: false
+  force-fragment: false
+  fix-url: false
+  proxy-rewrite: ''
+  report-self-message: false
+  remove-reply-at: false
+  extra-reply-data: false
+  skip-mime-scan: false
+
+output:
+  log-level: warn
+  log-aging: 15
+  log-force-new: true
+  debug: false
+
+default-middlewares: &default
+  access-token: ''
+  filter: ''
+  rate-limit:
+    enabled: false
+    frequency: 1
+    bucket: 1
+
+database:
+  leveldb:
+    enable: true
+
+servers:
+  - ws-reverse:
+      universal: ws://lucia:8765/ws
+      api: ''
+      event: ''
+      reconnect-interval: 3000
+      middlewares:
+        <<: *default

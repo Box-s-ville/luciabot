@@ -7,7 +7,7 @@
 
 安装好 docker 后，我们创建两个 Dockerfile，分别是机器人的前后端。
 
-在目录 `luciabot/gocqhttp` 下，如果你是一路复制粘贴本文提到的代码的话，应该会包括至少两个文件：`go-cqhttp` 和 `config.json`。如果你运行过机器人，那么可能还会有其他运行时生成的文件例如 logs。
+在目录 `luciabot/gocqhttp` 下，如果你是一路复制粘贴本文提到的代码的话，应该会包括至少两个文件：`go-cqhttp` 和 `config.yml`。如果你运行过机器人，那么可能还会有其他运行时生成的文件例如 logs。
 
 在此目录创建 `Dockerfile` 文件，内容如下：
 ```dockerfile
@@ -98,15 +98,13 @@ networks:
 
 在这里我们组网，内有三个程序：gocqhttp 会挂载本地的硬盘目录，并且开启交互 shell（如果你已经登录过，可以不用），python39 和 postgres db。其中数据库提前定义好用户名和密码，并且将地址以环境变量的方式提供给 python39.
 
-不要忘了同时修改 `luciabot/gocqhttp/config.json`：
+不要忘了同时修改 `luciabot/gocqhttp/config.yml`：
 ```diff
   ...
-  "ws_reverse_servers": [
-    {
-      "enabled": true,
--       "reverse_url": "ws://127.0.0.1:8765/ws",
-+       "reverse_url": "ws://lucia:8765/ws",
-      "reverse_api_url": "",
+  servers:
+  - ws-reverse:
+-     universal: ws://127.0.0.1:8765/ws
++     universal: ws://lucia:8765/ws
   ...
 ```
 
@@ -375,7 +373,7 @@ luciabot/
 ├── docker-compose.yml
 ├── gocqhttp/
 │   ├── Dockerfile
-│   ├── config.json
+│   ├── config.yml
 │   ├── go-cqhttp
 └── lucia/
     ├── Dockerfile

@@ -4,4 +4,4 @@ WORKDIR /usr/src/app
 
 RUN apk update && apk add tzdata
 
-CMD [ "./go-cqhttp-v0.9.30" ]
+CMD [ "./go-cqhttp-v1.0.0-beta7-fix2" ]

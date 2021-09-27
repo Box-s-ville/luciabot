@@ -30,7 +30,7 @@ Clone the project
 git clone https://github.com/Box-s-ville/luciabot && cd luciabot
 ```
 
-Go to [gocqhttp/config.json](./gocqhttp/config.json) and modify the robot's qq and password.
+Go to [gocqhttp/config.yml](./gocqhttp/config.yml) and modify the robot's qq and password.
 
 A [docker](https://www.docker.com/products/docker-desktop) environment is preferred. Deploying this app using docker is easy.
 

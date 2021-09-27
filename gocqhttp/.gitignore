@@ -4,3 +4,4 @@ log
 logs
 capcha.jpg
 device.json
+session.token

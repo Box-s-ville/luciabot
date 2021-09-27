@@ -99,72 +99,73 @@ async def _(session: CommandSession):
 这就是最小的 nonebot 机器人实例，你现在可以使用 `python bot.py` 命令来运行此程序，不过仅靠这还不行，因为我们现在还没有后端。
 
 ## 用 go-cqhttp 替代 CQHttp
-在 `luciabot` 下创建 `gocqhttp` 文件夹，到其 [release](https://github.com/Mrs4s/go-cqhttp/releases) 页面里下载适合自己平台的可执行文件并且解压到到此文件夹中（目前版本为 v0.9.30，若因版本更新导致配置文件格式变化，请参照与其默认配置不同处）。在相同的目录下创建 go-cqhttp 的配置文件，如下：
+在 `luciabot` 下创建 `gocqhttp` 文件夹，到其 [release](https://github.com/Mrs4s/go-cqhttp/releases) 页面里下载适合自己平台的可执行文件并且解压到到此文件夹中（<del>目前</del>更新时版本为 v1.0.0-beta7-fix2，若因版本更新导致配置文件格式变化，请参照与其默认配置不同处）。在相同的目录下创建 go-cqhttp 的配置文件，如下：
 
-`luciabot/gocqhttp/config.json`:
-```json
-{
-  "uin": 11111111,
-  "password": "123456",
-  "encrypt_password": false,
-  "password_encrypted": "",
-  "enable_db": true,
-  "access_token": "",
-  "relogin": {
-    "enabled": true,
-    "relogin_delay": 3,
-    "max_relogin_times": 0
-  },
-  "_rate_limit": {
-    "enabled": false,
-    "frequency": 1,
-    "bucket_size": 1
-  },
-  "ignore_invalid_cqcode": false,
-  "force_fragmented": false,
-  "heartbeat_interval": 10,
-  "http_config": {
-    "enabled": false,
-    "host": "0.0.0.0",
-    "port": 5700,
-    "timeout": 0,
-    "post_urls": {}
-  },
-  "ws_config": {
-    "enabled": false,
-    "host": "0.0.0.0",
-    "port": 6700
-  },
-  "ws_reverse_servers": [
-    {
-      "enabled": true,
-      "reverse_url": "ws://127.0.0.1:8765/ws",
-      "reverse_api_url": "",
-      "reverse_event_url": "",
-      "reverse_reconnect_interval": 3000
-    }
-  ],
-  "post_message_format": "string",
-  "debug": false,
-  "log_level": "",
-  "web_ui": {
-    "enabled": false,
-    "host": "0.0.0.0",
-    "web_ui_port": 9999,
-    "web_input": false
-  }
-}
+`luciabot/gocqhttp/config.yml`:
+```yml
+account:
+  uin: 11111111 
+  password: '123456'
+  encrypt: false
+  status: 0
+  relogin:
+    delay: 3
+    interval: 3
+    max-times: 0
+  use-sso-address: true
+
+heartbeat:
+  interval: 5
+
+message:
+  post-format: string
+  ignore-invalid-cqcode: false
+  force-fragment: false
+  fix-url: false
+  proxy-rewrite: ''
+  report-self-message: false
+  remove-reply-at: false
+  extra-reply-data: false
+  skip-mime-scan: false
+
+output:
+  log-level: warn
+  log-aging: 15
+  log-force-new: true
+  debug: false
+
+default-middlewares: &default
+  access-token: ''
+  filter: ''
+  rate-limit:
+    enabled: false
+    frequency: 1
+    bucket: 1
+
+database:
+  leveldb:
+    enable: true
+
+servers:
+  - ws-reverse:
+      universal: ws://127.0.0.1:8765/ws
+      api: ''
+      event: ''
+      reconnect-interval: 3000
+      middlewares:
+        <<: *default
+
 ```
-在这里前两个配置（`"uin"`, `"password"`）是机器人登录 QQ 号和密码。
+在这里前两个配置（`account.uin`, `account.password`）是机器人登录 QQ 号和密码。
 
-由于 nonebot 只通过开启 websocket 服务器来和后端沟通，所以在这里的配置文件中我们关闭 http 和正向 ws，只保留反向 ws （即 `"ws_reverse_servers"`）。请保证 `"reverse_url"` 的配置与 `luciabot/lucia/bot_config.py` 中的 IP 和端口一致。
+由于 nonebot 只通过开启 websocket 服务器来和后端沟通，所以在这里的配置文件中我们关闭 http 和正向 ws，只保留反向 ws （即 `servers.ws-reverse`）。请保证 `universal` 的配置与 `luciabot/lucia/bot_config.py` 中的 IP 和端口一致。
 
 这一步完成后，项目目录应如图所示：
 
 ```
 luciabot/
 ├── gocqhttp/       
-│   ├── config.json
+│   ├── config.yml
 │   └── go-cqhttp
 └── lucia/        
     ├── bot.py
@@ -194,7 +195,7 @@ Running on http://127.0.0.1:8765 (CTRL + C to quit)
 $ cd gocqhttp
 $ ./gocqhttp
 
-[2020-11-11 02:51:37] [INFO]: 当前版本:v0.9.29-fix2
+[2020-11-11 02:51:37] [INFO]: 当前版本:***
 [2020-11-11 02:51:37] [WARNING]: 虚拟设备信息不存在, 将自动生成随机设备.
 [2020-11-11 02:51:37] [INFO]: 已生成设备信息并保存到 device.json 文件.
 [2020-11-11 02:51:37] [INFO]: Bot将在5秒后登录并开始信息处理, 按 Ctrl+C 取消.
