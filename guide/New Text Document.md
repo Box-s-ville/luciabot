@@ -1,5 +1,8 @@
 # 使用 NoneBot 和 go-cqhttp 搭建 QQ 群聊机器人
 
+## 背景
+<details><summary>已不准确，点我展开</summary>
+
 原先 [NoneBot](https://github.com/nonebot/nonebot) 的文档过于老旧，有些内容可能没有参考价值。例如官方 README 中节选：
 > NoneBot 是一个基于 酷Q 的 Python 异步 QQ 机器人框架，它会对 QQ 机器人收到的消息进行解析和处理，并以插件化的形式，分发给消息所对应的命令处理器和自然语言处理器，来完成具体的功能。
 >
@@ -11,6 +14,8 @@
 NoneBot 过去是基于 酷Q 和 CQHttp 插件的机器人框架。可以理解为 酷Q 和 CQhttp 为机器人的“后端”，用于处理通信和协议，而 NoneBot 为 “前端”，负责机器人的逻辑，如发送天气等。随着八月初各大“后端”框架的扑街，两者一度被废弃至今。
 
 不过在这之后出现了 [OneBot](https://github.com/howmanybots/onebot) “标准”，提供和 CQHttp 类似的 api 规则。很多现在的机器人“后端”都可以遵循此标准，例如 go-cqhttp 和 mirai native 等。所以选择对的后端对实际上开发没有太大的影响。比如 go-cqhttp，可以当作 酷Q 的"drop-in replacement"。
+
+</details>
 
 ## 开始使用 Nonebot
 首先使用 pip 安装 nonebot （截至此稿<del>完成</del>更新最新版本为 1.9.0）：
