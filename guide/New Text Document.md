@@ -18,7 +18,7 @@ NoneBot 过去是基于 酷Q 和 CQHttp 插件的机器人框架。可以理解�
 </details>
 
 ## 开始使用 Nonebot
-首先使用 pip 安装 nonebot （截至此稿<del>完成</del>更新最新版本为 1.9.0）：
+首先使用 pip 安装 nonebot （截至此稿<del>完成</del>更新最新版本为 1.9.1）：
 ```sh
 $ pip install nonebot
 ```
