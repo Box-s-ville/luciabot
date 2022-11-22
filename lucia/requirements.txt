@@ -2,4 +2,4 @@ nonebot==1.9.1
 hypercorn==0.11.2
 jieba==0.42.1
 gino==1.0.1
-Pillow==8.3.2
+Pillow==9.3.0
